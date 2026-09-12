@@ -20,6 +20,11 @@ export function errorHandler(error, _req, res, _next) {
     error.message = "Invalid data.";
   }
 
+  if (error.name === "MongoServerSelectionError" || error.message?.includes("buffering timed out") || error.name === "MongooseError") {
+    error.statusCode = 503;
+    error.message = "Database service is temporarily unavailable. Please verify MONGODB_URI and MongoDB Atlas network access.";
+  }
+
   const status = error.statusCode || error.status || 500;
   const payload = {
     error: {

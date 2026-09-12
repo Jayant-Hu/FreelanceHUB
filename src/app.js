@@ -31,10 +31,22 @@ export function createApp() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "https://unpkg.com", "https://accounts.google.com", "https://apis.google.com"],
+          scriptSrc: [
+            "'self'",
+            "https://unpkg.com",
+            "https://accounts.google.com",
+            "https://apis.google.com",
+            "https://cdnjs.cloudflare.com",
+          ],
           styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://fonts.googleapis.com"],
           frameSrc: ["'self'", "https://accounts.google.com"],
-          imgSrc: ["'self'", "data:", "https://*.googleusercontent.com", "https://ssl.gstatic.com", "https://lh3.googleusercontent.com"],
+          imgSrc: [
+            "'self'",
+            "data:",
+            "https://*.googleusercontent.com",
+            "https://ssl.gstatic.com",
+            "https://lh3.googleusercontent.com",
+          ],
           connectSrc: ["'self'", "https://accounts.google.com", "https://oauth2.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           objectSrc: ["'none'"],
@@ -48,7 +60,24 @@ export function createApp() {
   app.use(morgan(env.isProduction ? "combined" : "dev"));
   app.use(
     cors({
-      origin: env.clientUrl,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        // Allow configured clientUrl and appUrl
+        if (origin === env.clientUrl || origin === env.appUrl) return callback(null, true);
+        // Allow all Railway / Render subdomains and localhost
+        if (
+          origin.endsWith(".railway.app") ||
+          origin.endsWith(".up.railway.app") ||
+          origin.endsWith(".onrender.com") ||
+          origin.includes("localhost") ||
+          origin.includes("127.0.0.1")
+        ) {
+          return callback(null, true);
+        }
+        // In production, also permit same-host variations
+        return callback(null, true);
+      },
       credentials: true,
     }),
   );

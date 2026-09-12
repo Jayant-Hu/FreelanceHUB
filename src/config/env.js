@@ -1,26 +1,41 @@
 import dotenv from "dotenv";
+import crypto from "node:crypto";
 
 dotenv.config();
 
-const requiredInProduction = [
-  "JWT_SECRET",
-];
-
 const isProduction = process.env.NODE_ENV === "production";
-const missing = requiredInProduction.filter((key) => !process.env[key]);
 
-if (isProduction && missing.length) {
-  throw new Error(`Missing required production environment variables: ${missing.join(", ")}`);
+// Safe fallback for JWT_SECRET in production if not explicitly configured in Railway/environment
+let jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  if (isProduction) {
+    console.warn("⚠️  [NOTICE] JWT_SECRET is not set in environment variables.");
+    console.warn("⚠️  FreelanceHub is using an auto-generated secret for this session.");
+    console.warn("⚠️  TIP: To persist user logins across service restarts, add JWT_SECRET to your Railway variables.");
+    jwtSecret = crypto.randomBytes(32).toString("hex");
+  } else {
+    jwtSecret = "development-only-change-me";
+  }
 }
+
+// Automatically detect Railway public domain if APP_URL / CLIENT_URL are not manually set
+const railwayPublicDomain = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : process.env.RAILWAY_STATIC_URL
+    ? `https://${process.env.RAILWAY_STATIC_URL}`
+    : "";
+
+const resolvedPort = Number(process.env.PORT || 3000);
+const defaultAppUrl = railwayPublicDomain || `http://localhost:${resolvedPort}`;
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   isProduction,
-  port: Number(process.env.PORT || 3000),
-  appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
-  clientUrl: process.env.CLIENT_URL || process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`,
+  port: resolvedPort,
+  appUrl: process.env.APP_URL || defaultAppUrl,
+  clientUrl: process.env.CLIENT_URL || process.env.APP_URL || defaultAppUrl,
   mongoUri: process.env.MONGODB_URI || "",
-  jwtSecret: process.env.JWT_SECRET || "development-only-change-me",
+  jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   paymentProvider: "demo",
   platformFeePercent: Number(process.env.PLATFORM_FEE_PERCENT || 12),
@@ -43,6 +58,7 @@ export const env = {
 
 export function assertRuntimeConfig() {
   if (!env.mongoUri) {
-    console.warn("Warning: MONGODB_URI not set. App will start without database connectivity.");
+    console.warn("⚠️  Warning: MONGODB_URI is not set. The app will run in offline/static mode without MongoDB.");
+    console.warn("⚠️  To enable full marketplace features, add MONGODB_URI in your Railway project variables.");
   }
 }
